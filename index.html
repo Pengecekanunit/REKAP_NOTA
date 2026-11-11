@@ -104,6 +104,13 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 <script>
 let T = localStorage.getItem('nota_token') || '', ME = null, DATA = [], CFG = null;
 const $ = id => document.getElementById(id);
+const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const tglID = (s, hari = true) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); if (!m) return s || '';
+  const dt = new Date(+m[1], +m[2] - 1, +m[3]);
+  return (hari ? HARI[dt.getDay()] + ', ' : '') + (+m[3]) + ' ' + BULAN[+m[2] - 1] + ' ' + m[1];
+};
 const rp = n => 'Rp ' + Number(n||0).toLocaleString('id-ID');
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API_URL = 'https://script.google.com/macros/s/AKfycbzdh9cA8iSiLwkVNs-_V9LepENiFsOIlrfuB-8JXahzeMvmPcB-cD4KO5eRHLhFt9sUTw/exec';
@@ -147,7 +154,7 @@ function draw() {
   const c = $('qCab').value, j = $('qJenis').value, b = $('qBln').value, u = $('qUser').value;
   const list = DATA.filter(d => (!c || d.cabang === c) && (!j || d.jenis === j) && (!b || d.tanggal.startsWith(b)) && (!u || d.nama === u));
   $('rows').innerHTML = list.map(d => `<tr>
-    <td>${esc(d.tanggal)}</td><td>${esc(d.cabang)}</td>
+    <td>${esc(tglID(d.tanggal))}${d.dibuat ? `<br><small style="color:var(--mute)">Diinput ${esc(d.dibuat)}</small>` : ''}</td><td>${esc(d.cabang)}</td>
     <td>${esc(d.jenis)}${d.hari ? ' (' + d.hari + ' hari)' : ''}</td>
     <td>${esc(d.ket)}</td><td>${esc(d.nama)}</td><td class="n">${rp(d.nominal)}</td>
     <td>${(ME.role === 'ADMIN' || ME.username === d.username) ? `<button class="del" data-id="${esc(d.id)}">Hapus</button>` : ''}</td></tr>`).join('');
@@ -216,7 +223,7 @@ $('bDl').onclick = () => {
   const total = list.reduce((s, d) => s + d.nominal, 0);
   let t = `<table border="1"><tr><td colspan="7"><b>REKAP NOTA PERJALANAN DINAS - ${esc(c || 'SEMUA CABANG')}${b ? ' - ' + esc(b) : ''}</b></td></tr>
     <tr style="background:#dfe9e7;font-weight:bold"><td>Tanggal</td><td>Cabang</td><td>Jenis</td><td>Jumlah Hari</td><td>Keterangan</td><td>Pengisi</td><td>Nominal</td></tr>`;
-  list.forEach(d => { t += `<tr><td style="mso-number-format:'@'">${esc(d.tanggal)}</td><td>${esc(d.cabang)}</td><td>${esc(d.jenis)}</td><td>${esc(d.hari)}</td><td>${esc(d.ket)}</td><td>${esc(d.nama)}</td>${num(d.nominal)}</tr>`; });
+  list.forEach(d => { t += `<tr><td style="mso-number-format:'@'">${esc(tglID(d.tanggal, false))}</td><td>${esc(d.cabang)}</td><td>${esc(d.jenis)}</td><td>${esc(d.hari)}</td><td>${esc(d.ket)}</td><td>${esc(d.nama)}</td>${num(d.nominal)}</tr>`; });
   t += `<tr style="font-weight:bold"><td colspan="6">TOTAL</td>${num(total)}</tr>`;
   const per = (key, judul) => {
     const m = {}; list.forEach(d => m[d[key]] = (m[d[key]] || 0) + d.nominal);
