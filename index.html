@@ -106,7 +106,7 @@ let T = localStorage.getItem('nota_token') || '', ME = null, DATA = [], CFG = nu
 const $ = id => document.getElementById(id);
 const rp = n => 'Rp ' + Number(n||0).toLocaleString('id-ID');
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const API_URL = 'GANTI_DENGAN_URL_WEB_APP_ANDA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzdh9cA8iSiLwkVNs-_V9LepENiFsOIlrfuB-8JXahzeMvmPcB-cD4KO5eRHLhFt9sUTw/exec';
 const run = async (fn, ...args) => {
   let r;
   try {
