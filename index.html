@@ -69,6 +69,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
       <div><label for="fTgl">Tanggal</label><input type="date" id="fTgl"></div>
       <div><label for="fCab">Cabang</label><select id="fCab"></select></div>
       <div><label for="fJenis">Jenis nota</label><select id="fJenis"></select></div>
+      <div id="wOrang" class="hide"><label for="fOrang">Jumlah orang</label><input type="number" id="fOrang" min="1" value="1"></div>
       <div id="wHari" class="hide"><label for="fHari">Jumlah hari</label><input type="number" id="fHari" min="1" value="1"></div>
       <div><label for="fNom">Nominal (Rp)</label><input type="number" id="fNom" min="0" inputmode="numeric"></div>
     </div>
@@ -174,7 +175,7 @@ function draw() {
   const list = DATA.filter(d => (!c || d.cabang === c) && (!j || d.jenis === j) && (!b || d.tanggal.startsWith(b)) && (!u || d.nama === u));
   $('rows').innerHTML = list.map(d => `<tr>
     <td>${esc(tglID(d.tanggal))}${d.dibuat ? `<br><small style="color:var(--mute)">Diinput ${esc(d.dibuat)}</small>` : ''}</td><td>${esc(d.cabang)}</td>
-    <td>${esc(d.jenis)}${d.hari ? ' (' + d.hari + ' hari)' : ''}</td>
+    <td>${esc(d.jenis)}${d.hari ? ' (' + d.hari + ' hari)' : ''}${d.orang ? `<br><small style="color:var(--mute)">${d.orang} orang · ${rp(Math.round(d.nominal / d.orang))}/orang</small>` : ''}</td>
     <td>${esc(d.ket)}</td><td>${esc(d.nama)}</td><td class="n">${rp(d.nominal)}</td>
     <td>${(ME.role === 'ADMIN' || ME.username === d.username) ? `<button class="del" data-id="${esc(d.id)}">Hapus</button>` : ''}</td></tr>`).join('');
   $('tot').textContent = rp(list.reduce((s, d) => s + d.nominal, 0));
@@ -185,15 +186,16 @@ function drawChart() {
   const a = $('gDari').value, b = $('gSampai').value, c = $('gCab').value;
   const list = DATA.filter(d => (!a || d.tanggal >= a) && (!b || d.tanggal <= b) && (!c || d.cabang === c));
   const m = {};
-  list.forEach(d => { const o = m[d.jenis] || (m[d.jenis] = { n: 0, sum: 0 }); o.n++; o.sum += d.nominal; });
+  list.forEach(d => { const o = m[d.jenis] || (m[d.jenis] = { n: 0, sum: 0, org: 0, orgSum: 0 }); o.n++; o.sum += d.nominal; if (d.orang) { o.org += d.orang; o.orgSum += d.nominal; } });
   const rows = Object.keys(m).map(k => ({ k, ...m[k] })).sort((x, y) => y.sum - x.sum);
   const max = rows.length ? rows[0].sum : 0;
   const periode = (a || b) ? (a ? tglID(a, false) : 'awal') + ' s/d ' + (b ? tglID(b, false) : 'sekarang') : 'Semua tanggal';
   $('gInfo').textContent = rows.length ? periode + ' · ' + list.length + ' nota · total ' + rp(list.reduce((s, d) => s + d.nominal, 0)) : 'Tidak ada nota pada pilihan ini.';
   $('chart').innerHTML = rows.map(r => `<div class="crow"><div class="clab">${esc(r.k)}<small>${r.n} nota</small></div>
-    <div><div class="ctrack"><div class="cbar" style="width:${max ? Math.max(r.sum / max * 100, 1) : 0}%"></div></div><div class="cval">${rp(r.sum)}</div></div></div>`).join('');
+    <div><div class="ctrack"><div class="cbar" style="width:${max ? Math.max(r.sum / max * 100, 1) : 0}%"></div></div><div class="cval">${rp(r.sum)}${r.org ? ` · rata-rata <b>${rp(Math.round(r.orgSum / r.org))}</b>/orang (${r.org} orang)` : ''}</div></div></div>`).join('');
 }
 function syncJenis() {
+  $('wOrang').classList.toggle('hide', !(CFG.jenisOrang || []).includes($('fJenis').value));
   const ud = $('fJenis').value === 'UANG DINAS PER HARI';
   $('wHari').classList.toggle('hide', !ud);
   $('fNom').disabled = ud;
@@ -237,7 +239,7 @@ $('bSave').onclick = async () => {
   $('bSave').disabled = true;
   try {
     await run('addNota', T, { tanggal: $('fTgl').value, cabang: $('fCab').value, jenis: $('fJenis').value,
-      hari: $('fHari').value, nominal: $('fNom').value, ket: $('fKet').value });
+      hari: $('fHari').value, orang: $('fOrang').value, nominal: $('fNom').value, ket: $('fKet').value });
     say($('fm'), 'Nota tersimpan.'); $('fKet').value = ''; if (!$('fNom').disabled) $('fNom').value = '';
     await load();
   } catch (e) { expired(e); }
@@ -255,14 +257,14 @@ $('bDl').onclick = () => {
   if (!list.length) return say($('dm'), 'Tidak ada nota untuk pilihan ini.', true);
   const num = n => `<td style="mso-number-format:'#,##0';text-align:right">${Number(n)}</td>`;
   const total = list.reduce((s, d) => s + d.nominal, 0);
-  let t = `<table border="1"><tr><td colspan="7"><b>REKAP NOTA PERJALANAN DINAS - ${esc(c || 'SEMUA CABANG')}${b ? ' - ' + esc(b) : ''}</b></td></tr>
-    <tr style="background:#dfe9e7;font-weight:bold"><td>Tanggal</td><td>Cabang</td><td>Jenis</td><td>Jumlah Hari</td><td>Keterangan</td><td>Pengisi</td><td>Nominal</td></tr>`;
-  list.forEach(d => { t += `<tr><td style="mso-number-format:'@'">${esc(tglID(d.tanggal, false))}</td><td>${esc(d.cabang)}</td><td>${esc(d.jenis)}</td><td>${esc(d.hari)}</td><td>${esc(d.ket)}</td><td>${esc(d.nama)}</td>${num(d.nominal)}</tr>`; });
-  t += `<tr style="font-weight:bold"><td colspan="6">TOTAL</td>${num(total)}</tr>`;
+  let t = `<table border="1"><tr><td colspan="9"><b>REKAP NOTA PERJALANAN DINAS - ${esc(c || 'SEMUA CABANG')}${b ? ' - ' + esc(b) : ''}</b></td></tr>
+    <tr style="background:#dfe9e7;font-weight:bold"><td>Tanggal</td><td>Cabang</td><td>Jenis</td><td>Jumlah Hari</td><td>Jumlah Orang</td><td>Keterangan</td><td>Pengisi</td><td>Nominal</td><td>Per Orang</td></tr>`;
+  list.forEach(d => { t += `<tr><td style="mso-number-format:'@'">${esc(tglID(d.tanggal, false))}</td><td>${esc(d.cabang)}</td><td>${esc(d.jenis)}</td><td>${esc(d.hari)}</td><td>${d.orang || ''}</td><td>${esc(d.ket)}</td><td>${esc(d.nama)}</td>${num(d.nominal)}${d.orang ? num(Math.round(d.nominal / d.orang)) : '<td></td>'}</tr>`; });
+  t += `<tr style="font-weight:bold"><td colspan="7">TOTAL</td>${num(total)}<td></td></tr>`;
   const per = (key, judul) => {
-    const m = {}; list.forEach(d => m[d[key]] = (m[d[key]] || 0) + d.nominal);
-    return `<tr><td colspan="7"></td></tr><tr style="font-weight:bold"><td colspan="7">${judul}</td></tr>` +
-      Object.keys(m).sort().map(k => `<tr><td colspan="6">${esc(k)}</td>${num(m[k])}</tr>`).join('');
+    const m = {}, o = {}; list.forEach(d => { m[d[key]] = (m[d[key]] || 0) + d.nominal; if (d.orang) { const x = o[d[key]] || (o[d[key]] = { n: 0, s: 0 }); x.n += d.orang; x.s += d.nominal; } });
+    return `<tr><td colspan="9"></td></tr><tr style="font-weight:bold"><td colspan="9">${judul}</td></tr>` +
+      Object.keys(m).sort().map(k => `<tr><td colspan="7">${esc(k)}${o[k] ? ' (rata-rata per orang dari ' + o[k].n + ' orang)' : ''}</td>${num(m[k])}${o[k] ? num(Math.round(o[k].s / o[k].n)) : '<td></td>'}</tr>`).join('');
   };
   if (!c) t += per('cabang', 'Ringkasan per cabang');
   t += per('jenis', 'Ringkasan per jenis nota') + '</table>';
