@@ -28,6 +28,13 @@ table{width:100%;border-collapse:collapse;min-width:720px}
 th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:13px;color:var(--mute);font-weight:500}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.chart{display:grid;gap:10px;margin-top:6px}
+.crow{display:grid;grid-template-columns:200px 1fr;gap:10px;align-items:center}
+.clab{font-size:14px}.clab small{display:block;color:var(--mute)}
+.ctrack{background:#edf1ee;border-radius:4px;height:26px;position:relative}
+.cbar{height:100%;background:var(--accent);border-radius:4px;min-width:3px;transition:width .3s}
+.cval{font-variant-numeric:tabular-nums;font-size:13px;margin-top:2px;color:var(--ink)}
+@media (max-width:640px){.crow{grid-template-columns:1fr;gap:4px}}
 .msg{min-height:20px;margin-top:8px;font-size:14px}.err{color:var(--warn)}.ok{color:var(--accent)}
 .login{max-width:360px;margin:12vh auto}
 .hide{display:none}
@@ -88,6 +95,18 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 
   <div class="panel">
+    <h2 style="font-size:19px;margin-bottom:12px">Diagram per jenis nota</h2>
+    <div class="filters">
+      <div><label for="gDari">Dari tanggal</label><input type="date" id="gDari"></div>
+      <div><label for="gSampai">Sampai tanggal</label><input type="date" id="gSampai"></div>
+      <div><label for="gCab">Cabang</label><select id="gCab"></select></div>
+      <div style="align-self:end"><button class="ghost" id="gReset">Reset</button></div>
+    </div>
+    <div id="gInfo" class="msg" style="color:var(--mute)"></div>
+    <div id="chart" class="chart"></div>
+  </div>
+
+  <div class="panel">
     <h2 style="font-size:19px;margin-bottom:12px">Unduh rekap</h2>
     <div class="bar" style="margin-bottom:0;align-items:end">
       <div class="filters">
@@ -136,7 +155,7 @@ async function start() {
   $('vLogin').classList.add('hide'); $('vApp').classList.remove('hide');
   $('who').textContent = ME.nama + ' · ' + ME.role;
   opts($('fCab'), CFG.cabang); opts($('fJenis'), CFG.jenis);
-  opts($('qCab'), CFG.cabang, true); opts($('dCab'), CFG.cabang, true); $('dCab').options[0].textContent = 'Semua cabang'; opts($('qJenis'), CFG.jenis, true);
+  opts($('qCab'), CFG.cabang, true); opts($('gCab'), CFG.cabang, true); $('gCab').options[0].textContent = 'Semua cabang'; opts($('dCab'), CFG.cabang, true); $('dCab').options[0].textContent = 'Semua cabang'; opts($('qJenis'), CFG.jenis, true);
   $('fTgl').value = new Date().toISOString().slice(0,10);
   syncJenis(); await load();
 }
@@ -160,6 +179,19 @@ function draw() {
     <td>${(ME.role === 'ADMIN' || ME.username === d.username) ? `<button class="del" data-id="${esc(d.id)}">Hapus</button>` : ''}</td></tr>`).join('');
   $('tot').textContent = rp(list.reduce((s, d) => s + d.nominal, 0));
   $('empty').textContent = list.length ? '' : 'Belum ada nota yang cocok dengan filter ini.';
+  drawChart();
+}
+function drawChart() {
+  const a = $('gDari').value, b = $('gSampai').value, c = $('gCab').value;
+  const list = DATA.filter(d => (!a || d.tanggal >= a) && (!b || d.tanggal <= b) && (!c || d.cabang === c));
+  const m = {};
+  list.forEach(d => { const o = m[d.jenis] || (m[d.jenis] = { n: 0, sum: 0 }); o.n++; o.sum += d.nominal; });
+  const rows = Object.keys(m).map(k => ({ k, ...m[k] })).sort((x, y) => y.sum - x.sum);
+  const max = rows.length ? rows[0].sum : 0;
+  const periode = (a || b) ? (a ? tglID(a, false) : 'awal') + ' s/d ' + (b ? tglID(b, false) : 'sekarang') : 'Semua tanggal';
+  $('gInfo').textContent = rows.length ? periode + ' · ' + list.length + ' nota · total ' + rp(list.reduce((s, d) => s + d.nominal, 0)) : 'Tidak ada nota pada pilihan ini.';
+  $('chart').innerHTML = rows.map(r => `<div class="crow"><div class="clab">${esc(r.k)}<small>${r.n} nota</small></div>
+    <div><div class="ctrack"><div class="cbar" style="width:${max ? Math.max(r.sum / max * 100, 1) : 0}%"></div></div><div class="cval">${rp(r.sum)}</div></div></div>`).join('');
 }
 function syncJenis() {
   const ud = $('fJenis').value === 'UANG DINAS PER HARI';
@@ -199,6 +231,8 @@ $('lp').onkeydown = e => { if (e.key === 'Enter') $('bLogin').click(); };
 $('bOut').onclick = async () => { try { await run('logout', T); } catch (e) {} localStorage.removeItem('nota_token'); location.reload(); };
 $('fJenis').onchange = syncJenis; $('fHari').oninput = syncJenis;
 ['qCab','qJenis','qBln','qUser'].forEach(id => $(id).onchange = draw);
+['gDari','gSampai','gCab'].forEach(id => $(id).onchange = drawChart);
+$('gReset').onclick = () => { $('gDari').value = ''; $('gSampai').value = ''; $('gCab').value = ''; drawChart(); };
 $('bSave').onclick = async () => {
   $('bSave').disabled = true;
   try {
