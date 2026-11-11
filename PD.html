@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&family=Fraunces:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1c2a2e;--mute:#5d6b6f;--paper:#f5f6f3;--card:#fff;--line:#d8ded9;--accent:#0f5c5c;--accent-ink:#fff;--warn:#a4402a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 'Public Sans',system-ui,sans-serif}
+h1,h2{font-family:Fraunces,Georgia,serif;font-weight:600;margin:0}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+header span{color:var(--mute);font-size:13px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+label{display:block;font-size:13px;color:var(--mute);margin-bottom:4px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff;color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{font:inherit;cursor:pointer;border-radius:6px;padding:9px 16px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink)}
+button.ghost{background:transparent;color:var(--accent)}
+button.del{border-color:var(--line);background:transparent;color:var(--warn);padding:3px 9px;font-size:13px}
+button:disabled{opacity:.5;cursor:wait}
+.total{font-family:Fraunces,serif;font-size:28px;color:var(--accent)}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between;margin-bottom:12px}
+.filters{display:flex;flex-wrap:wrap;gap:10px}.filters div{min-width:150px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:720px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:13px;color:var(--mute);font-weight:500}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.msg{min-height:20px;margin-top:8px;font-size:14px}.err{color:var(--warn)}.ok{color:var(--accent)}
+.login{max-width:360px;margin:12vh auto}
+.hide{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- LOGIN -->
+<div id="vLogin" class="login panel">
+  <h1>Rekap Nota Dinas</h1>
+  <p style="color:var(--mute)">Masuk untuk mengisi dan melihat rekap nota perjalanan dinas.</p>
+  <div style="margin-bottom:10px"><label for="lu">Username</label><input id="lu" autocomplete="username"></div>
+  <div style="margin-bottom:10px"><label for="lp" id="lpl">Password</label><input id="lp" type="password" autocomplete="current-password"></div>
+  <div id="wLp2" class="hide" style="margin-bottom:10px"><label for="lp2">Ulangi password</label><input id="lp2" type="password" autocomplete="new-password"></div>
+  <div style="margin-bottom:4px"></div>
+  <button id="bLogin" style="width:100%">Masuk</button>
+  <div id="lm" class="msg err"></div>
+</div>
+
+<!-- APLIKASI -->
+<div id="vApp" class="hide">
+  <header>
+    <div><h1>Rekap Nota Dinas</h1><span id="who"></span></div>
+    <button class="ghost" id="bOut">Keluar</button>
+  </header>
+
+  <div class="panel">
+    <h2 style="font-size:19px;margin-bottom:12px">Tambah nota</h2>
+    <div class="grid">
+      <div><label for="fTgl">Tanggal</label><input type="date" id="fTgl"></div>
+      <div><label for="fCab">Cabang</label><select id="fCab"></select></div>
+      <div><label for="fJenis">Jenis nota</label><select id="fJenis"></select></div>
+      <div id="wHari" class="hide"><label for="fHari">Jumlah hari</label><input type="number" id="fHari" min="1" value="1"></div>
+      <div><label for="fNom">Nominal (Rp)</label><input type="number" id="fNom" min="0" inputmode="numeric"></div>
+    </div>
+    <div style="margin-top:12px"><label for="fKet">Keterangan (opsional)</label><textarea id="fKet" rows="2" maxlength="300" placeholder="Contoh: makan siang tim, Bengkulu–Padang"></textarea></div>
+    <div style="margin-top:12px"><button id="bSave">Simpan nota</button></div>
+    <div id="fm" class="msg"></div>
+  </div>
+
+  <div class="panel">
+    <div class="bar">
+      <div class="filters">
+        <div><label for="qCab">Cabang</label><select id="qCab"></select></div>
+        <div><label for="qJenis">Jenis</label><select id="qJenis"></select></div>
+        <div><label for="qBln">Bulan</label><input type="month" id="qBln"></div>
+        <div><label for="qUser">Pengisi</label><select id="qUser"></select></div>
+      </div>
+      <div style="text-align:right"><label>Total (sesuai filter)</label><div class="total" id="tot">Rp 0</div></div>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>Tanggal</th><th>Cabang</th><th>Jenis</th><th>Keterangan</th><th>Pengisi</th><th class="n">Nominal</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div id="empty" class="msg" style="color:var(--mute)"></div>
+  </div>
+</div>
+</div>
+
+<script>
+let T = localStorage.getItem('nota_token') || '', ME = null, DATA = [], CFG = null;
+const $ = id => document.getElementById(id);
+const rp = n => 'Rp ' + Number(n||0).toLocaleString('id-ID');
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const API_URL = 'https://script.google.com/macros/s/AKfycbzdh9cA8iSiLwkVNs-_V9LepENiFsOIlrfuB-8JXahzeMvmPcB-cD4KO5eRHLhFt9sUTw/exec';
+const run = async (fn, ...args) => {
+  let r;
+  try {
+    const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: fn, args }) });
+    r = await res.json();
+  } catch (e) { throw new Error('Tidak bisa terhubung ke server. Periksa koneksi atau API_URL.'); }
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+};
+const say = (el, t, bad) => { el.textContent = t; el.className = 'msg ' + (bad ? 'err' : 'ok'); };
+
+async function boot() {
+  if (!T) return;
+  try { CFG = await run('getInit', T); start(); } catch (e) { T = ''; localStorage.removeItem('nota_token'); }
+}
+function opts(sel, arr, all) { sel.innerHTML = (all ? '<option value="">Semua</option>' : '') + arr.map(x => `<option>${esc(x)}</option>`).join(''); }
+
+async function start() {
+  ME = CFG.user;
+  $('vLogin').classList.add('hide'); $('vApp').classList.remove('hide');
+  $('who').textContent = ME.nama + ' · ' + ME.role;
+  opts($('fCab'), CFG.cabang); opts($('fJenis'), CFG.jenis);
+  opts($('qCab'), CFG.cabang, true); opts($('qJenis'), CFG.jenis, true);
+  $('fTgl').value = new Date().toISOString().slice(0,10);
+  syncJenis(); await load();
+}
+async function load() {
+  try { DATA = await run('getNota', T); } catch (e) { return expired(e); }
+  const users = [...new Set(DATA.map(d => d.nama))].sort();
+  const cur = $('qUser').value; opts($('qUser'), users, true); $('qUser').value = cur;
+  draw();
+}
+function draw() {
+  const c = $('qCab').value, j = $('qJenis').value, b = $('qBln').value, u = $('qUser').value;
+  const list = DATA.filter(d => (!c || d.cabang === c) && (!j || d.jenis === j) && (!b || d.tanggal.startsWith(b)) && (!u || d.nama === u));
+  $('rows').innerHTML = list.map(d => `<tr>
+    <td>${esc(d.tanggal)}</td><td>${esc(d.cabang)}</td>
+    <td>${esc(d.jenis)}${d.hari ? ' (' + d.hari + ' hari)' : ''}</td>
+    <td>${esc(d.ket)}</td><td>${esc(d.nama)}</td><td class="n">${rp(d.nominal)}</td>
+    <td>${(ME.role === 'ADMIN' || ME.username === d.username) ? `<button class="del" data-id="${esc(d.id)}">Hapus</button>` : ''}</td></tr>`).join('');
+  $('tot').textContent = rp(list.reduce((s, d) => s + d.nominal, 0));
+  $('empty').textContent = list.length ? '' : 'Belum ada nota yang cocok dengan filter ini.';
+}
+function syncJenis() {
+  const ud = $('fJenis').value === 'UANG DINAS PER HARI';
+  $('wHari').classList.toggle('hide', !ud);
+  $('fNom').disabled = ud;
+  if (ud) $('fNom').value = (parseInt($('fHari').value, 10) || 1) * CFG.uangDinas;
+}
+function expired(e) {
+  const m = (e && e.message) || String(e);
+  if (/Sesi berakhir/.test(m)) { T = ''; localStorage.removeItem('nota_token'); location.reload(); } else say($('fm'), m, true);
+}
+
+let SETUP = false;
+$('bLogin').onclick = async () => {
+  $('bLogin').disabled = true; $('lm').textContent = '';
+  try {
+    const u = $('lu').value, p = $('lp').value;
+    let r;
+    if (SETUP) r = await run('buatPassword', u, p, $('lp2').value);
+    else {
+      r = await run('login', u, p);
+      if (r.needSetup) {
+        SETUP = true; $('wLp2').classList.remove('hide');
+        $('lpl').textContent = 'Buat password baru (min. 6 karakter)';
+        $('lp').value = ''; $('lp').focus(); $('bLogin').textContent = 'Simpan password & masuk';
+        say($('lm'), 'Ini login pertama Anda. Buat password sendiri; hanya Anda yang tahu.');
+        $('bLogin').disabled = false; return;
+      }
+    }
+    T = r.token; localStorage.setItem('nota_token', T);
+    CFG = await run('getInit', T); start();
+  } catch (e) { say($('lm'), e.message || 'Gagal masuk.', true); }
+  $('bLogin').disabled = false;
+};
+$('lu').oninput = () => { if (SETUP) { SETUP = false; $('wLp2').classList.add('hide'); $('lpl').textContent = 'Password'; $('bLogin').textContent = 'Masuk'; } };
+$('lp').onkeydown = e => { if (e.key === 'Enter') $('bLogin').click(); };
+$('bOut').onclick = async () => { try { await run('logout', T); } catch (e) {} localStorage.removeItem('nota_token'); location.reload(); };
+$('fJenis').onchange = syncJenis; $('fHari').oninput = syncJenis;
+['qCab','qJenis','qBln','qUser'].forEach(id => $(id).onchange = draw);
+$('bSave').onclick = async () => {
+  $('bSave').disabled = true;
+  try {
+    await run('addNota', T, { tanggal: $('fTgl').value, cabang: $('fCab').value, jenis: $('fJenis').value,
+      hari: $('fHari').value, nominal: $('fNom').value, ket: $('fKet').value });
+    say($('fm'), 'Nota tersimpan.'); $('fKet').value = ''; if (!$('fNom').disabled) $('fNom').value = '';
+    await load();
+  } catch (e) { expired(e); }
+  $('bSave').disabled = false;
+};
+$('rows').onclick = async e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id || !confirm('Hapus nota ini?')) return;
+  try { await run('deleteNota', T, id); await load(); } catch (err) { expired(err); }
+};
+boot();
+</script>
+</body>
+</html>
