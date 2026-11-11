@@ -52,7 +52,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 <!-- APLIKASI -->
 <div id="vApp" class="hide">
   <header>
-    <div><h1>Rekap Nota Dinas</h1><span id="who"></span></div>
+    <div><h1>Rekap Nota Dinas</h1><span id="who"></span> <span id="sync" style="margin-left:8px"></span></div>
     <button class="ghost" id="bOut">Keluar</button>
   </header>
 
@@ -86,6 +86,18 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     </table></div>
     <div id="empty" class="msg" style="color:var(--mute)"></div>
   </div>
+
+  <div class="panel">
+    <h2 style="font-size:19px;margin-bottom:12px">Unduh rekap</h2>
+    <div class="bar" style="margin-bottom:0;align-items:end">
+      <div class="filters">
+        <div><label for="dCab">Cabang</label><select id="dCab"></select></div>
+        <div><label for="dBln">Bulan (kosongkan untuk semua)</label><input type="month" id="dBln"></div>
+      </div>
+      <button id="bDl">Unduh Excel</button>
+    </div>
+    <div id="dm" class="msg"></div>
+  </div>
 </div>
 </div>
 
@@ -94,7 +106,7 @@ let T = localStorage.getItem('nota_token') || '', ME = null, DATA = [], CFG = nu
 const $ = id => document.getElementById(id);
 const rp = n => 'Rp ' + Number(n||0).toLocaleString('id-ID');
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const API_URL = 'https://script.google.com/macros/s/AKfycbzdh9cA8iSiLwkVNs-_V9LepENiFsOIlrfuB-8JXahzeMvmPcB-cD4KO5eRHLhFt9sUTw/exec';
+const API_URL = 'GANTI_DENGAN_URL_WEB_APP_ANDA/exec';
 const run = async (fn, ...args) => {
   let r;
   try {
@@ -117,12 +129,16 @@ async function start() {
   $('vLogin').classList.add('hide'); $('vApp').classList.remove('hide');
   $('who').textContent = ME.nama + ' · ' + ME.role;
   opts($('fCab'), CFG.cabang); opts($('fJenis'), CFG.jenis);
-  opts($('qCab'), CFG.cabang, true); opts($('qJenis'), CFG.jenis, true);
+  opts($('qCab'), CFG.cabang, true); opts($('dCab'), CFG.cabang, true); $('dCab').options[0].textContent = 'Semua cabang'; opts($('qJenis'), CFG.jenis, true);
   $('fTgl').value = new Date().toISOString().slice(0,10);
   syncJenis(); await load();
 }
+let LASTV = null, BUSY = false;
 async function load() {
-  try { DATA = await run('getNota', T); } catch (e) { return expired(e); }
+  BUSY = true;
+  try { const v = await run('cekVersi', T); DATA = await run('getNota', T); LASTV = v; $('sync').textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+  catch (e) { BUSY = false; return expired(e); }
+  BUSY = false;
   const users = [...new Set(DATA.map(d => d.nama))].sort();
   const cur = $('qUser').value; opts($('qUser'), users, true); $('qUser').value = cur;
   draw();
@@ -191,6 +207,38 @@ $('rows').onclick = async e => {
   if (!id || !confirm('Hapus nota ini?')) return;
   try { await run('deleteNota', T, id); await load(); } catch (err) { expired(err); }
 };
+$('bDl').onclick = () => {
+  const c = $('dCab').value, b = $('dBln').value;
+  const list = DATA.filter(d => (!c || d.cabang === c) && (!b || d.tanggal.startsWith(b)))
+    .sort((x, y) => x.tanggal.localeCompare(y.tanggal) || x.cabang.localeCompare(y.cabang));
+  if (!list.length) return say($('dm'), 'Tidak ada nota untuk pilihan ini.', true);
+  const num = n => `<td style="mso-number-format:'#,##0';text-align:right">${Number(n)}</td>`;
+  const total = list.reduce((s, d) => s + d.nominal, 0);
+  let t = `<table border="1"><tr><td colspan="7"><b>REKAP NOTA PERJALANAN DINAS - ${esc(c || 'SEMUA CABANG')}${b ? ' - ' + esc(b) : ''}</b></td></tr>
+    <tr style="background:#dfe9e7;font-weight:bold"><td>Tanggal</td><td>Cabang</td><td>Jenis</td><td>Jumlah Hari</td><td>Keterangan</td><td>Pengisi</td><td>Nominal</td></tr>`;
+  list.forEach(d => { t += `<tr><td style="mso-number-format:'@'">${esc(d.tanggal)}</td><td>${esc(d.cabang)}</td><td>${esc(d.jenis)}</td><td>${esc(d.hari)}</td><td>${esc(d.ket)}</td><td>${esc(d.nama)}</td>${num(d.nominal)}</tr>`; });
+  t += `<tr style="font-weight:bold"><td colspan="6">TOTAL</td>${num(total)}</tr>`;
+  const per = (key, judul) => {
+    const m = {}; list.forEach(d => m[d[key]] = (m[d[key]] || 0) + d.nominal);
+    return `<tr><td colspan="7"></td></tr><tr style="font-weight:bold"><td colspan="7">${judul}</td></tr>` +
+      Object.keys(m).sort().map(k => `<tr><td colspan="6">${esc(k)}</td>${num(m[k])}</tr>`).join('');
+  };
+  if (!c) t += per('cabang', 'Ringkasan per cabang');
+  t += per('jenis', 'Ringkasan per jenis nota') + '</table>';
+  const html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>' + t + '</body></html>';
+  const name = 'Rekap_Nota_' + (c || 'Semua_Cabang').replace(/[^\w-]+/g, '_') + (b ? '_' + b : '') + '.xls';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  say($('dm'), 'File ' + name + ' diunduh (' + list.length + ' nota).');
+};
+async function poll() {
+  if (!ME || BUSY || document.hidden) return;
+  try { const v = await run('cekVersi', T); if (v !== LASTV) await load(); }
+  catch (e) { if (/Sesi berakhir/.test(e.message)) expired(e); }
+}
+setInterval(poll, 10000);
+document.addEventListener('visibilitychange', poll);
 boot();
 </script>
 </body>
