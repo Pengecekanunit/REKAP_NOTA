@@ -199,7 +199,7 @@ function syncJenis() {
   const ud = $('fJenis').value === 'UANG DINAS PER HARI';
   $('wHari').classList.toggle('hide', !ud);
   $('fNom').disabled = ud;
-  if (ud) $('fNom').value = (parseInt($('fHari').value, 10) || 1) * CFG.uangDinas;
+  if (ud) $('fNom').value = (parseInt($('fHari').value, 10) || 1) * (parseInt($('fOrang').value, 10) || 1) * CFG.uangDinas;
 }
 function expired(e) {
   const m = (e && e.message) || String(e);
@@ -231,7 +231,7 @@ $('bLogin').onclick = async () => {
 $('lu').oninput = () => { if (SETUP) { SETUP = false; $('wLp2').classList.add('hide'); $('lpl').textContent = 'Password'; $('bLogin').textContent = 'Masuk'; } };
 $('lp').onkeydown = e => { if (e.key === 'Enter') $('bLogin').click(); };
 $('bOut').onclick = async () => { try { await run('logout', T); } catch (e) {} localStorage.removeItem('nota_token'); location.reload(); };
-$('fJenis').onchange = syncJenis; $('fHari').oninput = syncJenis;
+$('fJenis').onchange = syncJenis; $('fHari').oninput = syncJenis; $('fOrang').oninput = syncJenis;
 ['qCab','qJenis','qBln','qUser'].forEach(id => $(id).onchange = draw);
 ['gDari','gSampai','gCab'].forEach(id => $(id).onchange = drawChart);
 $('gReset').onclick = () => { $('gDari').value = ''; $('gSampai').value = ''; $('gCab').value = ''; drawChart(); };
